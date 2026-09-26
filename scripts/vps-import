@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run as root on roguix.frolow.dev: import the newest build-x86_64 release,
-# so guix publish serves it.  The archive is signed with keys/builder.pub,
-# which the VPS authorizes once:  guix archive --authorize < keys/builder.pub
+# so guix publish serves it.  The archive is signed with the builder key,
+# modules/roguix/builder.pub, which (roguix systems vps) authorizes;
 # guix archive --import rejects anything else.
 #
 #   scripts/vps-import [TAG]

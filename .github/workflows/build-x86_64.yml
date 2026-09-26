@@ -1,6 +1,6 @@
 # Build manifests/x86_64.scm with the Guix of channels.scm and publish, as a
 # release, the store items bordeaux does not serve, signed with the builder
-# key (keys/builder.pub), for roguix.frolow.dev to import
+# key (modules/roguix/builder.pub), for roguix.frolow.dev to import
 # (scripts/vps-import).
 name: build-x86_64
 
@@ -66,7 +66,7 @@ jobs:
           test -s publish.txt || { echo "bordeaux serves everything"; exit 1; }
           sudo install -m 600 /dev/null /etc/guix/signing-key.sec
           printf '%s\n' "$BUILDER_KEY" | sudo tee /etc/guix/signing-key.sec > /dev/null
-          sudo install -m 644 keys/builder.pub /etc/guix/signing-key.pub
+          sudo install -m 644 modules/roguix/builder.pub /etc/guix/signing-key.pub
           guix archive --export $(cat publish.txt) | zstd -T0 -12 > roguix-x86_64.nar.zst
           sudo rm /etc/guix/signing-key.sec
           ls -l roguix-x86_64.nar.zst

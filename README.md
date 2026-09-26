@@ -20,7 +20,7 @@ the systems that run them, built by GitHub Actions and served by
 | `systems/vps.scm` | that system, for `guix system` |
 | `systems/vps-qemu.scm` | the same in an emulated x86_64 VM on a Mac |
 | `manifests/x86_64.scm` | what CI builds for x86_64 |
-| `keys/builder.pub` | CI's archive signing key; the secret half is the `BUILDER_SIGNING_KEY` Actions secret |
+| `modules/roguix/builder.pub` | CI's archive signing key; the secret half is the `BUILDER_SIGNING_KEY` Actions secret |
 | `scripts/vps-import` | on the VPS: import CI's newest release into guix publish |
 | `scripts/qemu-vps.sh`, `scripts/vps-qemu-setup` | run and set up the VM |
 
@@ -49,8 +49,10 @@ release `x86_64-DATE-COMMIT-ATTEMPT` with:
 - `vps-fetch.txt`: the rest, which the VPS substitutes from bordeaux,
   since an import needs every reference valid.
 
-The VPS pulls it; CI has no access to the VPS. Once, on the VPS:
-`guix archive --authorize < keys/builder.pub`. Then `scripts/vps-import`.
+The VPS pulls it with `scripts/vps-import`; CI has no access to the VPS.
+`(roguix systems vps)` authorizes the builder key
+(`modules/roguix/builder.pub`); elsewhere, `guix archive --authorize` it
+first.
 
 The builder key signs what the VPS imports and republishes under its own
 key, which Roguix VMs trust: keep `BUILDER_SIGNING_KEY` to workflows on
