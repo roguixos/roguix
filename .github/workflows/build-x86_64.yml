@@ -1,0 +1,82 @@
+# Build manifests/x86_64.scm with the Guix of channels.scm and publish, as a
+# release, the store items bordeaux does not serve, signed with the builder
+# key (keys/builder.pub), for roguix.frolow.dev to import
+# (scripts/vps-import).
+name: build-x86_64
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - channels.scm
+      - manifests/x86_64.scm
+      - modules/roguix/packages/**
+      - .github/workflows/build-x86_64.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-x86_64
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: PromyLOPh/guix-install-action@40615e98e5c16a451aec10fe01c214ed07cbaa77 # v1.6
+        with:
+          pullAfterInstall: false
+
+      - name: Get the Guix of channels.scm
+        run: guix time-machine -C channels.scm -- describe
+
+      - name: Build
+        run: |
+          guix time-machine -C channels.scm -- \
+            build --no-grafts -L modules -m manifests/x86_64.scm | tee outputs.txt
+
+      # Grafts are not substitutable (guix/grafts.scm), so the VPS grafts
+      # locally; only ungrafted items are published.  Items bordeaux serves
+      # the VPS substitutes from there before importing (vps-fetch.txt).
+      - name: Split the closure
+        run: |
+          guix gc -R $(cat outputs.txt) | sort -u > closure.txt
+          : > publish.txt
+          : > vps-fetch.txt
+          while read -r item; do
+            hash=$(basename "$item" | cut -d- -f1)
+            if curl -sfI -o /dev/null "https://bordeaux.guix.gnu.org/$hash.narinfo"; then
+              echo "$item" >> vps-fetch.txt
+            else
+              echo "$item" >> publish.txt
+            fi
+          done < closure.txt
+          wc -l closure.txt publish.txt vps-fetch.txt
+
+      - name: Export
+        if: github.ref == 'refs/heads/main'
+        env:
+          BUILDER_KEY: ${{ secrets.BUILDER_SIGNING_KEY }}
+        run: |
+          test -s publish.txt || { echo "bordeaux serves everything"; exit 1; }
+          sudo install -m 600 /dev/null /etc/guix/signing-key.sec
+          printf '%s\n' "$BUILDER_KEY" | sudo tee /etc/guix/signing-key.sec > /dev/null
+          sudo install -m 644 keys/builder.pub /etc/guix/signing-key.pub
+          guix archive --export $(cat publish.txt) | zstd -T0 -12 > roguix-x86_64.nar.zst
+          sudo rm /etc/guix/signing-key.sec
+          ls -l roguix-x86_64.nar.zst
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="x86_64-$(date -u +%Y%m%d)-${GITHUB_SHA::7}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" --target "$GITHUB_SHA" \
+            --title "$tag" --notes "Built by run $GITHUB_RUN_ID from $GITHUB_SHA." \
+            roguix-x86_64.nar.zst publish.txt vps-fetch.txt outputs.txt

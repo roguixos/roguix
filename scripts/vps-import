@@ -1,0 +1,38 @@
+#!/bin/bash
+# Run as root on roguix.frolow.dev: import the newest build-x86_64 release,
+# so guix publish serves it.  The archive is signed with keys/builder.pub,
+# which the VPS authorizes once:  guix archive --authorize < keys/builder.pub
+# guix archive --import rejects anything else.
+#
+#   scripts/vps-import [TAG]
+set -euo pipefail
+repo=roguixos/roguix
+tag=${1:-$(curl -sf "https://api.github.com/repos/$repo/releases?per_page=20" |
+  grep -o '"tag_name": *"x86_64-[^"]*"' | head -1 | cut -d'"' -f4)}
+dir=/var/cache/roguix-import/$tag
+mkdir -p "$dir"
+cd "$dir"
+for f in roguix-x86_64.nar.zst publish.txt vps-fetch.txt; do
+  [ -s "$f" ] || curl -sfL -o "$f" "https://github.com/$repo/releases/download/$tag/$f"
+done
+
+# guix archive --import needs every reference valid: take those from
+# bordeaux first.
+if [ -s vps-fetch.txt ]; then
+  nice -n 19 ionice -c3 guix build \
+    --substitute-urls=https://bordeaux.guix.gnu.org $(cat vps-fetch.txt) > /dev/null
+fi
+zstd -dc roguix-x86_64.nar.zst | nice -n 19 ionice -c3 guix archive --import
+
+# Bake guix publish's cache one item at a time, so no client request
+# starts compressing (it once hung this host).
+while read -r item; do
+  hash=$(basename "$item" | cut -d- -f1)
+  for _ in $(seq 360); do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8181/$hash.narinfo")
+    [ "$code" = 200 ] && break
+    sleep 5
+  done
+  [ "$code" = 200 ] || echo "not baked: $item ($code)"
+done < publish.txt
+echo "imported $tag: $(wc -l < publish.txt) items"
