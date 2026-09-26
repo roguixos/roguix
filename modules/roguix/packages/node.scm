@@ -38,4 +38,14 @@
            (delete 'replace-llhttp-sources)
            (delete 'patch-additional-hardcoded-program-references)
            (delete 'delete-problematic-tests)
-           (delete 'patch-problematic-tests)))))))
+           (delete 'patch-problematic-tests)
+           ;; node-lts's reason stands, but npm's tar moved write-entry.js
+           ;; to dist/{commonjs,esm}.
+           (replace 'ignore-number-of-hardlinks
+             (lambda* (#:key outputs #:allow-other-keys)
+               (substitute*
+                   (find-files (string-append (assoc-ref outputs "out")
+                                              "/lib/node_modules/npm"
+                                              "/node_modules/tar/dist")
+                               "^write-entry\\.js$")
+                 (("this.stat.nlink > 1") "false"))))))))))

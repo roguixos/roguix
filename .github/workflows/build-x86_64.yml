@@ -21,6 +21,11 @@ concurrency:
   group: build-x86_64
   cancel-in-progress: false
 
+# Explicit bash runs with pipefail: `guix build | tee` fails with guix.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: ubuntu-24.04
