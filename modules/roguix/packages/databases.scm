@@ -11,8 +11,8 @@
   #:use-module (gnu packages flex)
   #:export (postgresql-17))
 
-;; Guix stops at 16.  The VPS ran 17 on Debian: staying on 17 keeps its
-;; dumps loadable as they are (psql 16 rejects \restrict and
+;; Guix stops at 16.  Coming from another distribution's 17, staying on 17
+;; keeps its dumps loadable as they are (psql 16 rejects \restrict and
 ;; transaction_timeout in them).
 (define postgresql-17
   (package
